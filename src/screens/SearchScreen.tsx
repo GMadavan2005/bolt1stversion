@@ -14,37 +14,22 @@ export function SearchScreen() {
   const [searchMode, setSearchMode] = useState<'database' | 'spotify'>('database');
 
   useEffect(() => {
-    if (query.length > 2) {
-      const timer = setTimeout(() => {
-        handleSearch();
-      }, 500);
-      return () => clearTimeout(timer);
-    } else {
+    if (query.length < 2) {
       setResults([]);
       setSpotifyResults([]);
+      return;
     }
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      const songs = await searchSongs(query);
+      setResults(songs);
+      setLoading(false);
+    }, 150);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
-  async function handleSearch() {
-    setLoading(true);
-    try {
-      const dbResults = await searchSongs(query, 20);
-      setResults(dbResults);
-
-      if (dbResults.length < 5) {
-        setSearchMode('spotify');
-        const spotifyData = await searchSpotify(query, 'track', 20);
-        setSpotifyResults(spotifyData.tracks?.items || []);
-      } else {
-        setSearchMode('database');
-        setSpotifyResults([]);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleSpotifyTrackClick(track: any) {
     try {
@@ -84,15 +69,15 @@ export function SearchScreen() {
           </div>
         )}
 
-        {!loading && query.length > 2 && results.length === 0 && spotifyResults.length === 0 && (
+        {!loading && query.length > 2 && results.length === 0 && (
           <div className="text-center py-12">
             <p className="text-text-muted font-body">No results found</p>
           </div>
         )}
 
         {results.length > 0 && (
-          <section className="mb-8">
-            <h2 className="font-heading text-2xl text-text-primary mb-4">From Soundlog</h2>
+          <section>
+            <h2 className="font-heading text-2xl text-text-primary mb-4">Results</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {results.map((song) => (
                 <SongCard
@@ -100,40 +85,6 @@ export function SearchScreen() {
                   song={song}
                   onClick={() => navigate(`/song/${song.id}`)}
                 />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {spotifyResults.length > 0 && (
-          <section>
-            <h2 className="font-heading text-2xl text-text-primary mb-4">From Spotify</h2>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {spotifyResults.map((track) => (
-                <button
-                  key={track.id}
-                  onClick={() => handleSpotifyTrackClick(track)}
-                  className="group text-left transition-all transform hover:scale-105"
-                >
-                  <div className="relative mb-3 rounded-t-lg overflow-hidden bg-bg-card aspect-square">
-                    <img
-                      src={track.album.images[0]?.url}
-                      alt={track.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="px-2 space-y-1">
-                    <h3 className="font-heading text-[13px] text-text-primary truncate">
-                      {track.name}
-                    </h3>
-                    <p className="font-body text-[11px] text-text-muted truncate">
-                      {track.artists[0].name}
-                    </p>
-                    <p className="font-body text-[10px] text-text-very">
-                      {track.album.release_date.split('-')[0]}
-                    </p>
-                  </div>
-                </button>
               ))}
             </div>
           </section>

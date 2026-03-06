@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth-context';
 import { supabase } from '../lib/supabase';
@@ -166,6 +166,24 @@ function OnboardingDirectors() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const checkIfDone = async () => {
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('users')
+        .select('onboarding_complete')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (data?.onboarding_complete === true) {
+        window.location.href = '/home';
+      }
+    };
+
+    checkIfDone();
+  }, [user]);
+
   const toggleDirector = (director: string) => {
     setSelected(prev => prev.includes(director) ? prev.filter(d => d !== director) : [...prev, director]);
   };
@@ -231,10 +249,29 @@ function OnboardingArtists() {
   const [artists, setArtists] = useState<any[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  React.useEffect(() => {
+  useEffect(() => {
+    const checkIfDone = async () => {
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('users')
+        .select('onboarding_complete')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (data?.onboarding_complete === true) {
+        window.location.href = '/home';
+      }
+    };
+
+    checkIfDone();
+  }, [user]);
+
+  useEffect(() => {
     loadArtists();
   }, []);
 
@@ -259,17 +296,27 @@ function OnboardingArtists() {
   };
 
   async function handleFinish() {
-    if (!user || selected.length < 3) return;
+    if (!user) return;
     setLoading(true);
+    setError('');
 
     try {
-      await supabase
+      const { error: updateError } = await supabase
         .from('users')
-        .update({ favorite_artists: selected, onboarding_complete: true })
+        .update({
+          favorite_artists: selected.length > 0 ? selected : null,
+          onboarding_complete: true
+        })
         .eq('id', user.id);
-      navigate('/home');
+
+      if (updateError) throw updateError;
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      window.location.href = '/home';
     } catch (err) {
-      console.error(err);
+      console.error('Onboarding save failed:', err);
+      setError('Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
@@ -303,12 +350,18 @@ function OnboardingArtists() {
         ))}
       </div>
 
+      {error && (
+        <div className="mb-4 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg">
+          <p className="text-red-500 font-body text-sm">{error}</p>
+        </div>
+      )}
+
       <div className="flex gap-4 mt-auto">
         <button
-          onClick={() => navigate('/home')}
+          onClick={() => handleFinish()}
           className="flex-1 border border-border-primary text-text-primary font-body font-semibold py-3 rounded-full transition-all hover:border-accent-primary"
         >
-          Skip
+          Skip (Mark Complete)
         </button>
         <button
           onClick={handleFinish}
